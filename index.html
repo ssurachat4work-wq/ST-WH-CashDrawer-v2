@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบกระจายงาน Ultimate V3 (Drag & Drop + Dark Mode)</title>
+    <title>ระบบกระจายงาน V3.1</title>
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -69,6 +68,12 @@
         .btn-tool {
             @apply px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1 shadow-sm transform active:scale-95;
         }
+
+        /* --- IMPORTANT: CSS สำหรับจัดหน้า PDF --- */
+        .break-inside-avoid {
+            break-inside: avoid;
+            page-break-inside: avoid; /* สำหรับ Browser เก่า */
+        }
     </style>
 </head>
 <body class="p-4 md:p-8 min-h-screen transition-colors duration-300 bg-slate-50 text-slate-700 dark:bg-slate-900 dark:text-slate-200">
@@ -76,7 +81,6 @@
     <div id="app" class="max-w-[1400px] mx-auto">
         
         <div class="mb-8 relative">
-            
             <div class="flex justify-end gap-2 mb-2">
                  <button @click="saveDataToFile" class="btn-tool bg-blue-50 text-blue-600 dark:bg-slate-800 dark:text-blue-400 border border-blue-100 dark:border-slate-700">
                     <i class="fa-solid fa-download"></i> Save Data
@@ -93,9 +97,9 @@
             <div class="text-center">
                 <h1 class="text-3xl md:text-4xl font-bold text-indigo-700 dark:text-indigo-400 mb-2 drop-shadow-sm flex justify-center items-center gap-3">
                     <i class="fa-solid fa-scale-balanced"></i>
-                    ระบบกระจายงาน Ultimate V3
+                    ระบบกระจายงาน Ultimate V3.1
                 </h1>
-                <p class="text-gray-500 dark:text-gray-400 text-lg">Drag & Drop • Dark Mode • Save/Load</p>
+                <p class="text-gray-500 dark:text-gray-400 text-lg">Drag & Drop • Export Fixed • A4 Ready</p>
             </div>
             
             <transition name="fade">
@@ -318,7 +322,7 @@
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div v-for="(result, bucketIndex) in distributedResults" :key="bucketIndex" 
-                                 class="drop-zone border rounded-lg overflow-hidden flex flex-col h-full bg-white dark:bg-slate-700 shadow-sm hover:shadow-md transition group border-gray-200 dark:border-slate-600 break-inside-avoid"
+                                 class="drop-zone break-inside-avoid border rounded-lg overflow-hidden flex flex-col h-full bg-white dark:bg-slate-700 shadow-sm hover:shadow-md transition group border-gray-200 dark:border-slate-600"
                                  @dragover.prevent="handleDragOver"
                                  @drop="handleDrop($event, bucketIndex)"
                                  @dragenter="handleDragEnter"
@@ -399,11 +403,9 @@
             data() {
                 return {
                     isDarkMode: false,
-                    draggedItem: null, // Store info about dragged task
+                    draggedItem: null,
                     employees: [
-                        { name: 'พนักงาน 1', capacity: 100, id: 1 },
-                        { name: 'พนักงาน 2', capacity: 100, id: 2 },
-                        { name: 'พนักงาน 3', capacity: 100, id: 3 }
+                        { name: 'พนักงาน 1', capacity: 100, id: 1 }
                     ],
                     taskSets: [
                         { 
@@ -412,9 +414,8 @@
                             mode: 'single', 
                             tempName: '', tempValue: '', bulkInput: '',
                             items: [
-                                { name: "Job A", value: 50 },
-                                { name: "Job B", value: 30 },
-                                { name: "Job C", value: 20 }
+                                { name: "Job A", value: 50 }
+                        
                             ] 
                         }
                     ],
@@ -439,8 +440,7 @@
             },
             watch: {
                 employees: { handler() { this.saveToStorage(); }, deep: true },
-                taskSets: { handler() { this.saveToStorage(); }, deep: true },
-                distributedResults: { handler() { /* Maybe auto-save results too if needed */ }, deep: true }
+                taskSets: { handler() { this.saveToStorage(); }, deep: true }
             },
             computed: {
                 grandTotalWeight() { return this.distributedResults.reduce((sum, res) => sum + res.totalWeight, 0); },
@@ -468,61 +468,42 @@
                 handleDragStart(evt, bucketIndex, taskIndex) {
                     this.draggedItem = { bucketIndex, taskIndex };
                     evt.dataTransfer.effectAllowed = 'move';
-                    // Optional: Set custom drag image or data
                 },
                 handleDragOver(evt) {
-                    // Allow dropping
                     evt.preventDefault(); 
+                    evt.dataTransfer.dropEffect = 'move';
                     return false;
                 },
-                handleDragEnter(evt) {
-                    // Add visual cue
-                    evt.currentTarget.classList.add('drag-over');
-                },
-                handleDragLeave(evt) {
-                    // Remove visual cue
-                    evt.currentTarget.classList.remove('drag-over');
-                },
+                handleDragEnter(evt) { evt.currentTarget.classList.add('drag-over'); },
+                handleDragLeave(evt) { evt.currentTarget.classList.remove('drag-over'); },
                 handleDrop(evt, toBucketIndex) {
                     evt.currentTarget.classList.remove('drag-over');
                     
                     if (!this.draggedItem) return;
                     
                     const { bucketIndex: fromBucketIndex, taskIndex } = this.draggedItem;
-                    
-                    // Don't do anything if dropped in same bucket
                     if (fromBucketIndex === toBucketIndex) return;
 
-                    // Move item
                     const taskToMove = this.distributedResults[fromBucketIndex].tasks[taskIndex];
                     
-                    // Remove from source
                     this.distributedResults[fromBucketIndex].tasks.splice(taskIndex, 1);
                     this.distributedResults[fromBucketIndex].totalWeight -= taskToMove.value;
-                    // Fix floating point
                     this.distributedResults[fromBucketIndex].totalWeight = parseFloat(this.distributedResults[fromBucketIndex].totalWeight.toFixed(2));
 
-                    // Add to target
                     this.distributedResults[toBucketIndex].tasks.push(taskToMove);
                     this.distributedResults[toBucketIndex].totalWeight += taskToMove.value;
                     this.distributedResults[toBucketIndex].totalWeight = parseFloat(this.distributedResults[toBucketIndex].totalWeight.toFixed(2));
 
                     this.draggedItem = null;
                 },
-                // Recalculate weight if user edits value manually in result
                 recalcBucketWeight(bucketIndex) {
                     const bucket = this.distributedResults[bucketIndex];
                     bucket.totalWeight = bucket.tasks.reduce((sum, t) => sum + t.value, 0);
                 },
 
-
                 // --- Save / Load Data ---
                 saveDataToFile() {
-                    const data = {
-                        employees: this.employees,
-                        taskSets: this.taskSets,
-                        timestamp: Date.now()
-                    };
+                    const data = { employees: this.employees, taskSets: this.taskSets, timestamp: Date.now() };
                     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
                     const url = URL.createObjectURL(blob);
                     const link = document.createElement('a');
@@ -535,7 +516,6 @@
                 loadDataFromFile(event) {
                     const file = event.target.files[0];
                     if (!file) return;
-                    
                     const reader = new FileReader();
                     reader.onload = (e) => {
                         try {
@@ -552,11 +532,8 @@
                         }
                     };
                     reader.readAsText(file);
-                    // Reset input
                     event.target.value = '';
                 },
-
-                // --- Storage System (Local) ---
                 saveToStorage() {
                     localStorage.setItem('jd_employees_v3', JSON.stringify(this.employees));
                     localStorage.setItem('jd_taskSets_v3', JSON.stringify(this.taskSets));
@@ -568,14 +545,9 @@
                     if (tsk) this.taskSets = JSON.parse(tsk);
                 },
 
-                // --- Task Set Management ---
+                // --- Task Logic ---
                 addTaskSet() {
-                    this.taskSets.push({ 
-                        id: Date.now(), 
-                        setName: `ชุดที่ ${this.taskSets.length + 1}`,
-                        mode: 'single',
-                        tempName: '', tempValue: '', bulkInput: '', items: [] 
-                    });
+                    this.taskSets.push({ id: Date.now(), setName: `ชุดที่ ${this.taskSets.length + 1}`, mode: 'single', tempName: '', tempValue: '', bulkInput: '', items: [] });
                 },
                 removeTaskSet(index) { this.taskSets.splice(index, 1); },
                 resetTaskSets() {
@@ -594,8 +566,7 @@
                     const val = parseFloat(set.tempValue);
                     if (isNaN(val)) return;
                     set.items.push({ name: name, value: val });
-                    set.tempName = '';
-                    set.tempValue = '';
+                    set.tempName = ''; set.tempValue = '';
                 },
                 removeItemFromSet(set, index) { set.items.splice(index, 1); },
                 sumSet(set) { return set.items.reduce((s, i) => s + i.value, 0); },
@@ -621,12 +592,11 @@
                             }
                         }
                     });
-                    set.bulkInput = '';
-                    set.mode = 'single'; 
+                    set.bulkInput = ''; set.mode = 'single'; 
                     this.showToast(`เพิ่ม ${addedCount} รายการเรียบร้อย`);
                 },
 
-                // --- Employee Management ---
+                // --- Employee Logic ---
                 addEmployee() {
                     this.employees.push({ name: `พนักงาน ${this.employees.length + 1}`, capacity: 100, id: Date.now() });
                 },
@@ -641,7 +611,7 @@
                     }
                 },
 
-                // --- Calculation Logic ---
+                // --- Calculation ---
                 calculateDistribution() {
                     const activeEmployees = this.employees.filter(e => e.name.trim() !== "");
                     if (activeEmployees.length === 0) return this.showToast("กรุณาเพิ่มพนักงานอย่างน้อย 1 คน", 'error');
@@ -663,7 +633,6 @@
                     });
 
                     if (!hasWork) return this.showToast("ไม่พบรายการงาน", 'error');
-
                     allTasks.sort((a, b) => b.value - a.value);
 
                     allTasks.forEach(task => {
@@ -696,13 +665,12 @@
                     }, 100);
                 },
 
-                // --- Helpers & UI ---
+                // --- Style Helpers ---
                 showToast(msg, type = 'success') {
                     this.toast = { show: true, message: msg, type };
                     setTimeout(() => this.toast.show = false, 3000);
                 },
                 getStyle(index) { return this.colors[index % this.colors.length]; },
-                getBadgeColor(index) { const s = this.getStyle(index); return `${s.bg} ${s.text} ${s.border}`; },
                 getDotColor(index) { return this.getStyle(index).dot; },
                 getCapacityColor(cap) {
                     if (cap > 100) return 'text-green-600 font-bold border-green-200 bg-green-50 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
@@ -722,7 +690,7 @@
                     return 'text-green-600 bg-green-50 border-green-100 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
                 },
 
-                // --- Exports ---
+                // --- Exports (UPDATED) ---
                 copyText() {
                     let text = `สรุปการแบ่งงาน (${new Date().toLocaleDateString()})\n--------------------------------\n`;
                     this.distributedResults.forEach(res => {
@@ -756,27 +724,67 @@
                 exportToImage() {
                     const element = document.getElementById('export-area');
                     this.showToast("กำลังสร้างรูปภาพ...");
-                    // Temporarily force light mode for clean capture if needed, but html2canvas captures current styles
-                    html2canvas(element, { scale: 2, backgroundColor: this.isDarkMode ? '#1e293b' : '#ffffff' }).then(canvas => {
-                        const link = document.createElement('a');
-                        link.download = `Summary_${Date.now()}.png`;
-                        link.href = canvas.toDataURL();
-                        link.click();
-                        this.showToast("บันทึกรูปภาพเรียบร้อย");
+                    
+                    // html2canvas config
+                    const options = {
+                        scale: 2,
+                        useCORS: true,
+                        // สำคัญ: บังคับสีพื้นหลังให้เป็นสีขาว (แก้ปัญหารูปดำ/ไม่มี Text ในบาง Browser)
+                        backgroundColor: '#ffffff', 
+                        // callback เพื่อปรับแต่ง clone element ก่อนถ่ายภาพ
+                        onclone: (clonedDoc) => {
+                            const clonedElement = clonedDoc.getElementById('export-area');
+                            // บังคับเปลี่ยน class เป็น Light Mode ชั่วคราวเพื่อให้ Text ชัดเจนที่สุดในรูป
+                            clonedElement.classList.remove('dark');
+                            clonedElement.classList.add('light');
+                            // บังคับสีตัวอักษร
+                            clonedElement.style.color = '#1e293b'; 
+                        }
+                    };
+
+                    html2pdf().set({ html2canvas: options }).from(element).toImg().outputImg().then((img) => {
+                         // เนื่องจาก html2pdf.js เน้น PDF เราจึงใช้ html2canvas ตรงๆ หรือใช้ function ภายในช่วยก็ได้
+                         // แต่เพื่อความชัวร์ ใช้ html2canvas ตรงๆ จะดีกว่าสำหรับรูปภาพ
+                         // แต่ในที่นี้ผมใช้ html2pdf wrapper เพื่อความง่าย หรือถ้าจะใช้ html2canvas แบบ manual:
+                         
+                         // Re-using options for html2canvas global
+                         html2canvas(element, options).then(canvas => {
+                            const link = document.createElement('a');
+                            link.download = `Summary_${Date.now()}.png`;
+                            link.href = canvas.toDataURL();
+                            link.click();
+                            this.showToast("บันทึกรูปภาพเรียบร้อย");
+                         });
                     });
                 },
                 exportToPDF() {
                     const element = document.getElementById('export-area');
                     this.showToast("กำลังสร้าง PDF...");
+                    
                     const opt = {
-                        margin: 0.2,
-                        filename: `Distribution_${Date.now()}.pdf`,
-                        image: { type: 'jpeg', quality: 0.98 },
-                        html2canvas: { scale: 2, useCORS: true, backgroundColor: this.isDarkMode ? '#1e293b' : '#ffffff' },
-                        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+                        margin:       [10, 10, 10, 10], // top, left, bottom, right (mm)
+                        filename:     `Distribution_${Date.now()}.pdf`,
+                        image:        { type: 'jpeg', quality: 0.98 },
+                        html2canvas:  { 
+                            scale: 2, 
+                            useCORS: true, 
+                            backgroundColor: '#ffffff',
+                            onclone: (clonedDoc) => {
+                                const clonedElement = clonedDoc.getElementById('export-area');
+                                clonedElement.classList.remove('dark'); // บังคับ Light Mode ใน PDF
+                                clonedElement.style.color = '#000000';
+                            }
+                        },
+                        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                        // สำคัญ: ตั้งค่า pagebreak เพื่อไม่ให้ตัดกลางกล่อง
+                        pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
                     };
+
                     html2pdf().set(opt).from(element).save().then(() => {
                         this.showToast("บันทึก PDF เรียบร้อย");
+                    }).catch(err => {
+                        console.error(err);
+                        this.showToast("เกิดข้อผิดพลาดในการสร้าง PDF", "error");
                     });
                 }
             }
