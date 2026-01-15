@@ -1,376 +1,468 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบกระจายงานอัตโนมัติ Pro (Job Distributor)</title>
-    
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบกระจายงาน Pro Max (Auto-Save + Lock)</title>
+    
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <style>
-        body { font-family: 'Sarabun', sans-serif; background-color: #f3f4f6; }
-        .card { transition: all 0.3s ease; }
-        .card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-    </style>
+    <style>
+        body { font-family: 'Sarabun', sans-serif; background-color: #f0f2f5; }
+        .card { transition: all 0.3s ease; }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        .btn-press:active { transform: scale(0.95); }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
+    </style>
 </head>
-<body class="p-4 md:p-8">
+<body class="p-4 md:p-6 text-slate-800">
 
-    <div id="app" class="max-w-7xl mx-auto">
-        
-        <div class="text-center mb-10">
-            <h1 class="text-4xl font-bold text-indigo-700 mb-2">⚖️ ระบบกระจายงาน Pro</h1>
-            <p class="text-gray-600 text-lg">อัลกอริทึมเกลี่ยงานตามน้ำหนัก (Weighted Load Balancing)</p>
-        </div>
+    <div id="app" class="max-w-[1400px] mx-auto">
+        
+        <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div>
+                <h1 class="text-3xl font-bold text-indigo-700 flex items-center gap-3">
+                    <i class="fa-solid fa-scale-balanced"></i> ระบบกระจายงาน <span class="text-orange-500 text-lg bg-orange-100 px-2 py-1 rounded-lg">Pro Max</span>
+                </h1>
+                <p class="text-slate-500 text-sm mt-1">Weighted Load Balancing + History Tracking + Auto Save</p>
+            </div>
+            <div class="flex gap-3">
+                <button @click="resetAllData" class="px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 text-sm font-bold transition btn-press">
+                    <i class="fa-solid fa-trash-can mr-1"></i> ล้างระบบใหม่หมด
+                </button>
+            </div>
+        </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
-            <div class="lg:col-span-5 space-y-6">
-                
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-indigo-100 card">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-                            <span>👥</span> 1. รายชื่อพนักงาน ({{ employees.length }})
-                        </h2>
-                        <div class="space-x-2">
-                            <button @click="resetEmployees" class="text-xs text-gray-400 hover:text-red-500 underline">รีเซ็ต</button>
-                            <button @click="addEmployee" class="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-100 text-sm font-semibold transition">+ เพิ่มคน</button>
-                        </div>
-                    </div>
-                    <div class="space-y-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
-                        <div v-for="(emp, index) in employees" :key="index" class="flex items-center gap-2 group">
-                            <span class="text-gray-400 w-6 text-sm font-mono">{{ index + 1 }}.</span>
-                            <input type="text" v-model="emp.name" 
-                                class="flex-1 border border-gray-200 rounded px-3 py-1.5 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition text-sm" 
-                                placeholder="ชื่อพนักงาน">
-                            <button @click="removeEmployee(index)" class="text-gray-300 hover:text-red-500 font-bold px-2 opacity-0 group-hover:opacity-100 transition">×</button>
-                        </div>
-                    </div>
-                </div>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <div class="lg:col-span-4 space-y-6">
+                
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 card">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="font-bold text-slate-700 flex items-center gap-2">
+                            <span class="bg-indigo-100 text-indigo-600 w-8 h-8 rounded-lg flex items-center justify-center"><i class="fa-solid fa-users"></i></span>
+                            พนักงาน ({{ employees.length }})
+                        </h2>
+                        <button @click="addEmployee" class="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-100 text-xs font-bold transition">
+                            <i class="fa-solid fa-plus"></i> เพิ่ม
+                        </button>
+                    </div>
+                    
+                    <div class="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                        <div v-for="(emp, index) in employees" :key="index" class="flex items-center gap-2 group p-2 rounded hover:bg-slate-50 border border-transparent hover:border-slate-100 transition">
+                            <span class="text-slate-400 w-5 text-xs font-mono">{{ index + 1 }}.</span>
+                            <div class="flex-1">
+                                <input type="text" v-model="emp.name" 
+                                    class="w-full bg-transparent border-b border-slate-200 focus:border-indigo-500 focus:outline-none text-sm pb-1" 
+                                    placeholder="ชื่อพนักงาน">
+                                <div class="text-[10px] text-slate-400 mt-0.5 flex justify-between">
+                                    <span>งานสะสม: <b>{{ (emp.accumulatedWeight || 0).toLocaleString() }}</b></span>
+                                    <button @click="resetIndividualHistory(index)" class="text-xs text-red-300 hover:text-red-500" title="ล้างประวัติคนนี้">รีเซ็ต</button>
+                                </div>
+                            </div>
+                            <button @click="removeEmployee(index)" class="text-slate-300 hover:text-red-500 w-6 h-6 flex items-center justify-center rounded hover:bg-red-50 transition">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-orange-100 card">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-                            <span>📦</span> 2. ชุดข้อมูลงาน ({{ taskSets.length }})
-                        </h2>
-                        <div class="space-x-2">
-                            <button @click="resetTaskSets" class="text-xs text-gray-400 hover:text-red-500 underline">ล้างงาน</button>
-                            <button @click="addTaskSet" class="bg-orange-50 text-orange-600 px-3 py-1.5 rounded-lg hover:bg-orange-100 text-sm font-semibold transition">+ เพิ่มชุดงาน</button>
-                        </div>
-                    </div>
-                    
-                    <div class="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                        <div v-for="(set, setIndex) in taskSets" :key="set.id" 
-                             class="border rounded-lg p-4 bg-white relative transition-colors"
-                             :class="setIndex === 0 ? 'border-red-200 bg-red-50/30' : 'border-gray-200'">
-                            
-                            <div class="flex justify-between items-center mb-2">
-                                <span class="font-bold text-gray-700 text-sm flex items-center gap-2">
-                                    <span class="w-3 h-3 rounded-full" :class="getDotColor(setIndex)"></span>
-                                    ชุดที่ {{ setIndex + 1 }} 
-                                    <span v-if="setIndex === 0" class="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Priority</span>
-                                </span>
-                                <button @click="removeTaskSet(setIndex)" class="text-gray-400 hover:text-red-600 text-xs">ลบ</button>
-                            </div>
-                            
-                            <div class="mb-2">
-                                <textarea v-model="set.rawInput" 
-                                    class="w-full h-20 border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:border-orange-500 font-mono resize-none" 
-                                    placeholder="วางตัวเลขที่นี่ เช่น: 55 20 14..."></textarea>
-                            </div>
-                            <div class="flex justify-between text-xs text-gray-500">
-                                <span>Preview: {{ (set.rawInput.match(/-?\d+(\.\d+)?/g) || []).length }} รายการ</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 card">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="font-bold text-slate-700 flex items-center gap-2">
+                            <span class="bg-orange-100 text-orange-600 w-8 h-8 rounded-lg flex items-center justify-center"><i class="fa-solid fa-box-open"></i></span>
+                            งานใหม่ ({{ taskSets.length }})
+                        </h2>
+                        <div class="space-x-1">
+                            <button @click="clearTaskInputs" class="text-xs text-slate-400 hover:text-red-500 px-2">ล้างค่า</button>
+                            <button @click="addTaskSet" class="bg-orange-50 text-orange-600 px-3 py-1.5 rounded-lg hover:bg-orange-100 text-xs font-bold transition">
+                                <i class="fa-solid fa-plus"></i> เพิ่มชุด
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+                        <div v-for="(set, setIndex) in taskSets" :key="set.id" 
+                             class="border rounded-lg p-3 bg-white relative transition-all focus-within:ring-2 focus-within:ring-orange-100"
+                             :class="setIndex === 0 ? 'border-orange-200' : 'border-slate-200'">
+                            
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-bold text-slate-600 text-xs flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full" :class="getDotColor(setIndex)"></span>
+                                    ชุดที่ {{ setIndex + 1 }} 
+                                </span>
+                                <button @click="removeTaskSet(setIndex)" class="text-slate-300 hover:text-red-500"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                            </div>
+                            
+                            <textarea v-model="set.rawInput" 
+                                class="w-full h-16 bg-slate-50 border border-slate-200 rounded-md p-2 text-sm focus:outline-none focus:bg-white focus:border-orange-500 font-mono resize-none text-slate-600" 
+                                placeholder="ใส่ตัวเลข เช่น: 50 20 10..."></textarea>
+                                
+                            <div class="text-right text-[10px] text-slate-400 mt-1">
+                                พบ {{ (set.rawInput.match(/-?\d+(\.\d+)?/g) || []).length }} รายการ
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                <button @click="calculateDistribution" 
-                    class="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-4 rounded-xl shadow-lg transition transform hover:scale-[1.02] flex items-center justify-center gap-2 text-lg">
-                    <span>🚀</span> คำนวณและกระจายงานทันที
-                </button>
+                <button @click="calculateDistribution" 
+                    class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-200 transition transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 text-lg">
+                    <i class="fa-solid fa-calculator"></i> คำนวณการกระจาย
+                </button>
 
-            </div>
+            </div>
 
-            <div class="lg:col-span-7">
-                
-                <div v-if="distributedResults.length > 0" class="animate-fade-in-up">
-                    
-                    <div class="flex flex-wrap gap-2 mb-4 justify-end bg-white p-2 rounded-lg shadow-sm inline-flex float-right">
-                        <span class="text-xs text-gray-400 self-center mr-2">Export:</span>
-                        <button @click="exportToExcel" class="bg-green-100 text-green-700 px-3 py-1.5 rounded hover:bg-green-200 text-sm font-medium transition flex items-center gap-1">📊 Excel</button>
-                        <button @click="exportToImage" class="bg-purple-100 text-purple-700 px-3 py-1.5 rounded hover:bg-purple-200 text-sm font-medium transition flex items-center gap-1">🖼️ Image</button>
-                        <button @click="exportToPDF" class="bg-red-100 text-red-700 px-3 py-1.5 rounded hover:bg-red-200 text-sm font-medium transition flex items-center gap-1">📄 PDF</button>
-                        <button @click="copyText" class="bg-gray-100 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-200 text-sm font-medium transition flex items-center gap-1">📋 Copy</button>
-                    </div>
-                    <div class="clear-both"></div>
+            <div class="lg:col-span-8">
+                
+                <div v-if="distributedResults.length > 0" class="animate-fade-in-up flex flex-col h-full">
+                    
+                    <div class="bg-indigo-900 text-white p-4 rounded-t-xl shadow-md flex flex-wrap justify-between items-center gap-4">
+                        <div>
+                            <h2 class="text-lg font-bold flex items-center gap-2">
+                                <i class="fa-solid fa-chart-pie"></i> ผลการคำนวณ (Preview)
+                            </h2>
+                            <p class="text-indigo-200 text-xs">ตรวจสอบความถูกต้องก่อนกดยืนยัน</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button @click="commitResults" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md transition flex items-center gap-2 btn-press">
+                                <i class="fa-solid fa-check-circle"></i> ยืนยันและล็อกงาน
+                            </button>
+                        </div>
+                    </div>
 
-                    <div id="export-area" class="bg-white p-8 rounded-xl shadow-lg border border-gray-100 min-h-[600px]">
-                        
-                        <div class="text-center mb-8 border-b border-gray-200 pb-6">
-                            <h2 class="text-2xl font-bold text-gray-800">สรุปผลการแบ่งงาน</h2>
-                            <p class="text-gray-500 text-sm mt-1">วันที่คำนวณ: {{ new Date().toLocaleString('th-TH') }}</p>
-                            
-                            <div class="flex justify-center gap-4 mt-4">
-                                <div class="bg-blue-50 px-4 py-2 rounded-lg text-center">
-                                    <div class="text-xs text-blue-500 font-semibold uppercase">งานทั้งหมด</div>
-                                    <div class="text-xl font-bold text-blue-700">{{ grandTotalItems }} <span class="text-sm font-normal">ชิ้น</span></div>
-                                </div>
-                                <div class="bg-green-50 px-4 py-2 rounded-lg text-center">
-                                    <div class="text-xs text-green-500 font-semibold uppercase">Weight รวม</div>
-                                    <div class="text-xl font-bold text-green-700">{{ grandTotalWeight.toLocaleString() }}</div>
-                                </div>
-                                <div class="bg-orange-50 px-4 py-2 rounded-lg text-center">
-                                    <div class="text-xs text-orange-500 font-semibold uppercase">ค่าเฉลี่ย/คน</div>
-                                    <div class="text-xl font-bold text-orange-700">~{{ (grandTotalWeight / employees.length).toFixed(1) }}</div>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="bg-white border-x border-slate-200 p-2 flex justify-end gap-2 text-xs">
+                        <button @click="copyText" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 transition"><i class="fa-regular fa-copy"></i> Copy</button>
+                        <button @click="exportToExcel" class="px-3 py-1 bg-green-50 hover:bg-green-100 rounded text-green-700 transition"><i class="fa-regular fa-file-excel"></i> Excel</button>
+                        <button @click="exportToImage" class="px-3 py-1 bg-purple-50 hover:bg-purple-100 rounded text-purple-700 transition"><i class="fa-regular fa-image"></i> Image</button>
+                    </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div v-for="(result, idx) in distributedResults" :key="idx" 
-                                 class="border rounded-lg overflow-hidden flex flex-col h-full bg-white shadow-sm hover:shadow-md transition">
-                                
-                                <div class="p-3 border-b flex justify-between items-center bg-gray-50">
-                                    <div class="flex items-center gap-2">
-                                        <div class="bg-indigo-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">{{ idx + 1 }}</div>
-                                        <h3 class="font-bold text-gray-800">{{ result.employeeName }}</h3>
-                                    </div>
-                                    <div class="text-right">
-                                        <span class="text-xs text-gray-500 mr-1">รวม:</span>
-                                        <span class="font-bold text-lg text-indigo-700">{{ result.totalWeight.toLocaleString() }}</span>
-                                    </div>
-                                </div>
-                                
-                                <div class="p-3 bg-white flex-1">
-                                    <div v-if="result.tasks.length === 0" class="text-center text-gray-400 py-4 text-sm">
-                                        - ไม่มีงานที่ได้รับมอบหมาย -
-                                    </div>
-                                    <div v-else class="flex flex-wrap gap-1.5">
-                                        <div v-for="(task, tIndex) in result.tasks" :key="tIndex" 
-                                             class="px-2 py-1 rounded text-xs border flex items-center gap-1 shadow-sm"
-                                             :class="getBadgeColor(task.originalSetIndex)">
-                                            <span class="font-bold text-sm">{{ task.value }}</span>
-                                            </div>
-                                    </div>
-                                </div>
+                    <div id="export-area" class="bg-white p-6 rounded-b-xl shadow-lg border border-slate-200 flex-1">
+                        
+                        <div class="flex flex-wrap gap-4 justify-center mb-8 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                            <div class="text-center px-4 border-r border-slate-200 last:border-0">
+                                <div class="text-xs text-slate-500 uppercase tracking-wider font-semibold">งานเดิมสะสม</div>
+                                <div class="text-xl font-bold text-slate-400">{{ totalHistoryWeight.toLocaleString() }}</div>
+                            </div>
+                            <div class="text-center px-4 border-r border-slate-200 last:border-0">
+                                <div class="text-xs text-indigo-500 uppercase tracking-wider font-semibold">งานใหม่เพิ่ม</div>
+                                <div class="text-xl font-bold text-indigo-600">+{{ totalNewWeight.toLocaleString() }}</div>
+                            </div>
+                            <div class="text-center px-4">
+                                <div class="text-xs text-green-600 uppercase tracking-wider font-semibold">รวมทั้งหมด</div>
+                                <div class="text-xl font-bold text-green-700">{{ (totalHistoryWeight + totalNewWeight).toLocaleString() }}</div>
+                            </div>
+                        </div>
 
-                                <div class="bg-gray-50 px-3 py-2 text-xs text-gray-500 border-t flex justify-between">
-                                    <span>จำนวน: {{ result.tasks.length }} รายการ</span>
-                                    <span>Diff: {{ (result.totalWeight - (grandTotalWeight / employees.length)).toFixed(1) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div v-for="(result, idx) in distributedResults" :key="idx" 
+                                 class="border rounded-xl overflow-hidden flex flex-col bg-white hover:shadow-md transition group">
+                                
+                                <div class="p-3 bg-slate-50 border-b flex justify-between items-center">
+                                    <div class="flex items-center gap-3">
+                                        <div class="bg-indigo-600 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shadow-sm">{{ idx + 1 }}</div>
+                                        <div>
+                                            <h3 class="font-bold text-slate-700 text-sm leading-tight">{{ result.name }}</h3>
+                                            <p class="text-[10px] text-slate-500">
+                                                เดิม: {{ result.startWeight.toLocaleString() }} 
+                                                <span class="text-indigo-600 font-bold ml-1">+{{ result.addedWeight.toLocaleString() }}</span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-[10px] text-slate-400 uppercase">รวมสุทธิ</div>
+                                        <div class="font-bold text-lg text-slate-800 leading-none">{{ result.finalWeight.toLocaleString() }}</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="p-3 flex-1 flex flex-wrap content-start gap-1.5 min-h-[80px]">
+                                    
+                                    <div v-if="result.newTasks.length === 0" class="w-full text-center text-slate-300 py-4 text-xs italic">
+                                        ไม่ได้เพิ่มงาน
+                                    </div>
 
-                <div v-else class="h-full flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50/50 min-h-[400px]">
-                    <div class="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mb-4 text-4xl">
-                        🤔
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-500">ยังไม่มีข้อมูลการคำนวณ</h3>
-                    <p class="text-sm">กรุณากรอกรายชื่อและชุดงานทางซ้ายมือ แล้วกดปุ่มคำนวณ</p>
-                </div>
+                                    <div v-for="(task, tIndex) in result.newTasks" :key="tIndex" 
+                                         class="px-2 py-1 rounded text-xs border font-mono font-bold shadow-sm animate-fade-in-up"
+                                         :style="{ animationDelay: `${tIndex * 50}ms` }"
+                                         :class="getBadgeColor(task.originalSetIndex)">
+                                        {{ task.value }}
+                                    </div>
+                                </div>
 
-            </div>
-        </div>
-    </div>
+                                <div class="bg-slate-50 px-3 py-1.5 text-[10px] text-slate-400 border-t flex justify-between">
+                                    <span>เพิ่ม: {{ result.newTasks.length }} ชิ้น</span>
+                                    <span>Diff: {{ (result.finalWeight - averageWeight).toFixed(1) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-    <script>
-        const { createApp } = Vue;
+                <div v-else class="h-full flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50/50 min-h-[500px]">
+                    <div class="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-6 shadow-sm border border-slate-100">
+                        <i class="fa-solid fa-hourglass-start text-4xl text-slate-300"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-600 mb-2">พร้อมคำนวณ</h3>
+                    <p class="text-sm max-w-xs text-center mb-6">กรอกรายชื่อและชุดงานทางซ้ายมือ แล้วกดปุ่มคำนวณ ระบบจะจัดงานโดยอิงจากประวัติเดิม</p>
+                    
+                    <div class="flex gap-4 text-xs text-slate-500">
+                        <span class="flex items-center gap-1"><i class="fa-solid fa-save text-green-500"></i> Auto Save</span>
+                        <span class="flex items-center gap-1"><i class="fa-solid fa-lock text-orange-500"></i> Lock Results</span>
+                    </div>
+                </div>
 
-        createApp({
-            data() {
-                return {
-                    employees: Array.from({length: 4}, (_, i) => ({ name: `พนักงาน ${i + 1}` })),
-                    taskSets: [
-                        { id: 1, rawInput: "55 20 14 16 12 8 90", tasks: [] },
-                        { id: 2, rawInput: "6 27 20 28 39", tasks: [] },
-                    ],
-                    distributedResults: [],
-                    // Color Palette
-                    colors: [
-                        { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-200', dot: 'bg-red-500' },
-                        { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-200', dot: 'bg-orange-500' },
-                        { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200', dot: 'bg-blue-500' },
-                        { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-200', dot: 'bg-emerald-500' },
-                        { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-200', dot: 'bg-purple-500' },
-                        { bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-200', dot: 'bg-pink-500' },
-                        { bg: 'bg-cyan-100', text: 'text-cyan-800', border: 'border-cyan-200', dot: 'bg-cyan-500' },
-                    ]
-                }
-            },
-            computed: {
-                grandTotalWeight() {
-                    return this.distributedResults.reduce((sum, res) => sum + res.totalWeight, 0);
-                },
-                grandTotalItems() {
-                    return this.distributedResults.reduce((sum, res) => sum + res.tasks.length, 0);
-                }
-            },
-            methods: {
-                // --- Management ---
-                addEmployee() {
-                    this.employees.push({ name: `พนักงาน ${this.employees.length + 1}` });
-                },
-                removeEmployee(index) {
-                    if (this.employees.length > 0) this.employees.splice(index, 1);
-                },
-                resetEmployees() {
-                    if(confirm('ล้างรายชื่อทั้งหมด?')) this.employees = [];
-                },
-                addTaskSet() {
-                    this.taskSets.push({ id: Date.now(), rawInput: "", tasks: [] });
-                },
-                removeTaskSet(index) {
-                    this.taskSets.splice(index, 1);
-                },
-                resetTaskSets() {
-                     if(confirm('ล้างชุดงานทั้งหมด?')) this.taskSets = [{ id: Date.now(), rawInput: "", tasks: [] }];
-                },
+            </div>
+        </div>
+    </div>
 
-                // --- Styling Helper ---
-                getStyle(index) {
-                    return this.colors[index % this.colors.length];
-                },
-                getBadgeColor(index) {
-                    const style = this.getStyle(index);
-                    return `${style.bg} ${style.text} ${style.border}`;
-                },
-                getDotColor(index) {
-                    return this.getStyle(index).dot;
-                },
+    <script>
+        const { createApp } = Vue;
 
-                // --- Core Logic ---
-                parseInput(raw) {
-                    const numbers = raw.match(/-?\d+(\.\d+)?/g);
-                    return numbers ? numbers.map(Number) : [];
-                },
+        createApp({
+            data() {
+                return {
+                    // --- Data Models ---
+                    employees: [
+                        { name: "พนักงาน 1", accumulatedWeight: 0, historyCount: 0 },
+                        { name: "พนักงาน 2", accumulatedWeight: 0, historyCount: 0 },
+                        { name: "พนักงาน 3", accumulatedWeight: 0, historyCount: 0 },
+                        { name: "พนักงาน 4", accumulatedWeight: 0, historyCount: 0 },
+                    ],
+                    taskSets: [
+                        { id: 1, rawInput: "", tasks: [] }
+                    ],
+                    
+                    // --- Results State ---
+                    distributedResults: [],
+                    
+                    // --- UI Config ---
+                    colors: [
+                        { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-200', dot: 'bg-red-500' },
+                        { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-200', dot: 'bg-orange-500' },
+                        { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-200', dot: 'bg-emerald-500' },
+                        { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200', dot: 'bg-blue-500' },
+                        { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-200', dot: 'bg-purple-500' },
+                        { bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-200', dot: 'bg-pink-500' },
+                        { bg: 'bg-cyan-100', text: 'text-cyan-800', border: 'border-cyan-200', dot: 'bg-cyan-500' },
+                    ]
+                }
+            },
+            
+            // --- Auto Save Logic ---
+            watch: {
+                employees: {
+                    handler(val) { localStorage.setItem('jd_pro_employees', JSON.stringify(val)); },
+                    deep: true
+                },
+                taskSets: {
+                    handler(val) { localStorage.setItem('jd_pro_taskSets', JSON.stringify(val)); },
+                    deep: true
+                }
+            },
+            
+            mounted() {
+                // Load data on startup
+                const savedEmp = localStorage.getItem('jd_pro_employees');
+                const savedSets = localStorage.getItem('jd_pro_taskSets');
+                
+                if (savedEmp) this.employees = JSON.parse(savedEmp);
+                if (savedSets) this.taskSets = JSON.parse(savedSets);
+            },
 
-                calculateDistribution() {
-                    if (this.employees.length === 0) {
-                        alert("กรุณาเพิ่มพนักงานอย่างน้อย 1 คน");
-                        return;
-                    }
+            computed: {
+                totalHistoryWeight() {
+                    return this.distributedResults.reduce((sum, r) => sum + r.startWeight, 0);
+                },
+                totalNewWeight() {
+                    return this.distributedResults.reduce((sum, r) => sum + r.addedWeight, 0);
+                },
+                averageWeight() {
+                    if (this.employees.length === 0) return 0;
+                    return (this.totalHistoryWeight + this.totalNewWeight) / this.employees.length;
+                }
+            },
 
-                    // 1. Prepare Employee Buckets
-                    let buckets = this.employees.map(e => ({
-                        name: e.name,
-                        tasks: [],
-                        totalWeight: 0
-                    }));
+            methods: {
+                // --- Management ---
+                addEmployee() {
+                    this.employees.push({ name: `พนักงาน ${this.employees.length + 1}`, accumulatedWeight: 0, historyCount: 0 });
+                },
+                removeEmployee(index) {
+                    if (confirm('ยืนยันลบพนักงาน? ประวัติงานของคนนี้จะหายไปด้วย')) {
+                        this.employees.splice(index, 1);
+                    }
+                },
+                resetIndividualHistory(index) {
+                    if(confirm(`รีเซ็ตค่าน้ำหนักสะสมของ "${this.employees[index].name}" เป็น 0?`)) {
+                        this.employees[index].accumulatedWeight = 0;
+                        this.employees[index].historyCount = 0;
+                    }
+                },
+                resetAllData() {
+                    if(confirm('⚠️ เตือน: ข้อมูลรายชื่อและประวัติงานทั้งหมดจะหายไป เริ่มต้นใหม่หมด?')) {
+                        localStorage.removeItem('jd_pro_employees');
+                        localStorage.removeItem('jd_pro_taskSets');
+                        location.reload(); // Reload for clean slate
+                    }
+                },
+                
+                addTaskSet() {
+                    this.taskSets.push({ id: Date.now(), rawInput: "", tasks: [] });
+                },
+                removeTaskSet(index) {
+                    this.taskSets.splice(index, 1);
+                },
+                clearTaskInputs() {
+                    if(confirm('ล้างข้อมูลงานที่กรอกไว้ทั้งหมด?')) {
+                        this.taskSets = [{ id: Date.now(), rawInput: "", tasks: [] }];
+                        this.distributedResults = [];
+                    }
+                },
 
-                    // 2. Process Task Sets
-                    this.taskSets.forEach((set, setIndex) => {
-                        const tasks = this.parseInput(set.rawInput);
-                        tasks.sort((a, b) => b - a);
+                // --- Styles ---
+                getStyle(index) { return this.colors[index % this.colors.length]; },
+                getBadgeColor(index) { 
+                    const style = this.getStyle(index);
+                    return `${style.bg} ${style.text} ${style.border}`;
+                },
+                getDotColor(index) { return this.getStyle(index).dot; },
 
-                        tasks.forEach(taskValue => {
-                            let minIndex = 0;
-                            let minWeight = buckets[0].totalWeight;
+                // --- Core Logic ---
+                parseInput(raw) {
+                    const numbers = raw.match(/-?\d+(\.\d+)?/g);
+                    return numbers ? numbers.map(Number) : [];
+                },
 
-                            for (let i = 1; i < buckets.length; i++) {
-                                if (buckets[i].totalWeight < minWeight) {
-                                    minWeight = buckets[i].totalWeight;
-                                    minIndex = i;
-                                }
-                            }
+                calculateDistribution() {
+                    if (this.employees.length === 0) return alert("กรุณาเพิ่มพนักงานก่อน");
 
-                            buckets[minIndex].tasks.push({
-                                value: taskValue,
-                                originalSetIndex: setIndex
-                            });
-                            buckets[minIndex].totalWeight += taskValue;
-                        });
-                    });
+                    // 1. Prepare Buckets (เริ่มจากน้ำหนักสะสมเดิม)
+                    // เราสร้าง Simulation Buckets ขึ้นมา ไม่กระทบข้อมูลจริงจนกว่าจะ Commit
+                    let buckets = this.employees.map(e => ({
+                        originalRef: e, // อ้างอิงกลับ object จริง
+                        name: e.name,
+                        startWeight: e.accumulatedWeight || 0, // น้ำหนักเริ่มต้นจากประวัติ
+                        currentWeight: e.accumulatedWeight || 0, // ใช้คำนวณ
+                        newTasks: [], // งานใหม่ที่จะได้รับ
+                        addedWeight: 0
+                    }));
 
-                    // 3. Post-process
-                    buckets.forEach(bucket => {
-                        bucket.tasks.sort((a, b) => {
-                            if (a.originalSetIndex !== b.originalSetIndex) {
-                                return a.originalSetIndex - b.originalSetIndex;
-                            }
-                            return b.value - a.value;
-                        });
-                    });
+                    // 2. Collect all new tasks
+                    let allNewTasks = [];
+                    this.taskSets.forEach((set, setIndex) => {
+                        const tasks = this.parseInput(set.rawInput);
+                        tasks.forEach(val => {
+                            allNewTasks.push({ value: val, originalSetIndex: setIndex });
+                        });
+                    });
 
-                    this.distributedResults = buckets.map(b => ({
-                        employeeName: b.name,
-                        tasks: b.tasks,
-                        totalWeight: parseFloat(b.totalWeight.toFixed(2))
-                    }));
-                },
+                    if (allNewTasks.length === 0) return alert("ไม่พบข้อมูลตัวเลขในช่องกรอกงาน");
 
-                // --- Exports ---
-                copyText() {
-                    let text = `สรุปการแบ่งงาน (${new Date().toLocaleDateString()})\n\n`;
-                    this.distributedResults.forEach(res => {
-                        text += `👤 ${res.employeeName} [รวม: ${res.totalWeight}]\n`;
-                        const tasksStr = res.tasks.map(t => `${t.value}`).join(", ");
-                        text += `   งาน: ${tasksStr}\n\n`;
-                    });
-                    navigator.clipboard.writeText(text).then(() => alert("คัดลอกเรียบร้อย!"));
-                },
+                    // 3. Sort tasks descending (Greedy approach)
+                    allNewTasks.sort((a, b) => b.value - a.value);
 
-                exportToExcel() {
-                    let data = [];
-                    let maxTasks = 0;
-                    this.distributedResults.forEach(res => {
-                        if (res.tasks.length > maxTasks) maxTasks = res.tasks.length;
-                        let row = {
-                            "ชื่อพนักงาน": res.employeeName,
-                            "น้ำหนักรวม": res.totalWeight,
-                            "จำนวนชิ้น": res.tasks.length
-                        };
-                        res.tasks.forEach((t, i) => {
-                            row[`งานที่ ${i+1}`] = t.value;
-                            row[`ชุดงาน ${i+1}`] = t.originalSetIndex + 1;
-                        });
-                        data.push(row);
-                    });
-                    const ws = XLSX.utils.json_to_sheet(data);
-                    const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, "Work_Distribution");
-                    XLSX.writeFile(wb, `Distribution_${new Date().toISOString().slice(0,10)}.xlsx`);
-                },
+                    // 4. Distribute
+                    allNewTasks.forEach(task => {
+                        // หาคนที่ currentWeight น้อยที่สุด
+                        buckets.sort((a, b) => a.currentWeight - b.currentWeight);
+                        
+                        const target = buckets[0];
+                        target.newTasks.push(task);
+                        target.currentWeight += task.value;
+                        target.addedWeight += task.value;
+                    });
 
-                exportToImage() {
-                    const element = document.getElementById('export-area');
-                    const originalStyle = element.style.cssText;
-                    element.style.backgroundColor = "white";
-                    
-                    html2canvas(element, { scale: 2 }).then(canvas => {
-                        const link = document.createElement('a');
-                        link.download = 'distribution_summary.png';
-                        link.href = canvas.toDataURL();
-                        link.click();
-                        element.style.cssText = originalStyle;
-                    });
-                },
+                    // 5. Sort tasks back by set index (for display beauty)
+                    buckets.forEach(b => {
+                        b.newTasks.sort((a, b) => a.originalSetIndex - b.originalSetIndex || b.value - a.value);
+                        b.finalWeight = parseFloat(b.currentWeight.toFixed(2));
+                    });
 
-                exportToPDF() {
-                    const element = document.getElementById('export-area');
-                    const opt = {
-                        margin:       0.2,
-                        filename:     'work_distribution.pdf',
-                        image:        { type: 'jpeg', quality: 0.98 },
-                        html2canvas:  { scale: 2, useCORS: true },
-                        jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
-                    };
-                    html2pdf().set(opt).from(element).save();
-                }
-            }
-        }).mount('#app');
-    </script>
+                    // Sort employees for display (optional: sort by name or load)
+                    // let's keep original index to prevent confusion
+                    // But we map results to index of employees
+                    
+                    // Re-order results to match original employee order for consistency
+                    this.distributedResults = this.employees.map(emp => {
+                        return buckets.find(b => b.name === emp.name);
+                    });
+                },
+
+                commitResults() {
+                    if(!confirm('✅ ยืนยันการล็อกงานชุดนี้?\n\n- น้ำหนักงานจะถูกบวกรวมเข้ากับประวัติพนักงาน\n- ช่องกรอกงานจะถูกรีเซ็ต\n- พร้อมสำหรับการรับงานชุดต่อไป')) return;
+
+                    // Update History (Real Commit)
+                    this.distributedResults.forEach((res, index) => {
+                        // อัปเดตข้อมูลจริงใน employee list
+                        const emp = this.employees[index];
+                        emp.accumulatedWeight = res.finalWeight; 
+                        emp.historyCount = (emp.historyCount || 0) + res.newTasks.length;
+                    });
+
+                    // Clear Inputs
+                    this.taskSets = [{ id: Date.now(), rawInput: "", tasks: [] }];
+                    this.distributedResults = [];
+
+                    alert("บันทึกเรียบร้อย! พร้อมสำหรับงานชุดถัดไป");
+                },
+
+                // --- Exports ---
+                copyText() {
+                    let text = `สรุปจ่ายงาน (${new Date().toLocaleTimeString()})\n`;
+                    this.distributedResults.forEach(res => {
+                        if(res.newTasks.length > 0) {
+                            text += `👤 ${res.name} (งานเพิ่ม ${res.newTasks.length} ชิ้น)\n`;
+                            text += `   [${res.newTasks.map(t => t.value).join(', ')}]\n`;
+                        }
+                    });
+                    navigator.clipboard.writeText(text).then(() => alert("คัดลอกแล้ว"));
+                },
+                exportToExcel() {
+                    let data = [];
+                    this.distributedResults.forEach(res => {
+                        if(res.newTasks.length > 0) {
+                            let row = {
+                                "พนักงาน": res.name,
+                                "น้ำหนักเดิม": res.startWeight,
+                                "น้ำหนักงานใหม่": res.addedWeight,
+                                "น้ำหนักสุทธิ": res.finalWeight,
+                                "จำนวนชิ้นใหม่": res.newTasks.length,
+                                "รายการงาน": res.newTasks.map(t => t.value).join(', ')
+                            };
+                            data.push(row);
+                        }
+                    });
+                    if(data.length === 0) return alert('ไม่มีข้อมูลงานใหม่ให้ Export');
+                    
+                    const ws = XLSX.utils.json_to_sheet(data);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "Job_Distribution");
+                    XLSX.writeFile(wb, `Job_Lock_${new Date().toISOString().slice(0,10)}.xlsx`);
+                },
+                exportToImage() {
+                    const el = document.getElementById('export-area');
+                    html2canvas(el).then(canvas => {
+                        const link = document.createElement('a');
+                        link.download = 'summary.png';
+                        link.href = canvas.toDataURL();
+                        link.click();
+                    });
+                }
+            }
+        }).mount('#app');
+    </script>
 </body>
 </html>
